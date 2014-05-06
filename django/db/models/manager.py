@@ -73,6 +73,9 @@ class BaseManager(object):
     def check(self, **kwargs):
         return []
 
+    def get_by_natural_key(self, *args):
+        return self.get(**dict(zip(self.model._natural_key_fieldnames(), args)))
+
     @classmethod
     def _get_queryset_methods(cls, queryset_class):
         def create_method(name, method):

@@ -1409,6 +1409,44 @@ class Model(six.with_metaclass(ModelBase)):
                 )
         return errors
 
+    @classmethod
+    def _natural_key_fieldnames(cls):
+        """
+        Helper method for model.natural_key and manager.get_by_natural_key.
+
+        The fieldnames follow Django's double-underscore notation.
+
+        If no suitable fieldnames are found, the method will return an
+        empty sequence.
+        """
+        if cls._meta.unique_together:
+            unique_fieldnames = cls._meta.unique_together[0]
+        else:
+            unique_fieldnames = [
+                f.name for f in cls._meta.fields
+                if f.unique and not f.auto_created
+            ]
+        natural_key_fieldnames = []
+        for field_name in unique_fieldnames:
+            field, _, _, _ = cls._meta.get_field_by_name(field_name)
+            if not field.rel:
+                natural_key_fieldnames.append(field.name)
+            else:
+                natural_key_fieldnames.extend(
+                    '%s__%s' % (field.name, i) for i in
+                    field.rel.to._natural_key_fieldnames()
+                )
+        return natural_key_fieldnames
+
+    def natural_key(self):
+        fieldnames = self.__class__._natural_key_fieldnames()
+        if not fieldnames:
+            raise NotImplementedError(
+                'The %s class must provide a natural_key() method.' %
+                self.__class__.__name__
+            )
+        return tuple(reduce(getattr, f.split('__'), self) for f in fieldnames)
+
 
 ############################################
 # HELPER FUNCTIONS (CURRIED MODEL METHODS) #
