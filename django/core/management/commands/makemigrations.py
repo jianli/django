@@ -1,5 +1,7 @@
+import datetime
 import os
 import sys
+import time
 from itertools import takewhile
 
 from django.apps import apps
@@ -16,6 +18,8 @@ from django.db.migrations.questioner import (
 from django.db.migrations.state import ProjectState
 from django.db.migrations.utils import get_migration_name_timestamp
 from django.db.migrations.writer import MigrationWriter
+
+LOCK_FILE_NAME = 'migrations.lock'
 
 
 class Command(BaseCommand):
@@ -221,6 +225,24 @@ class Command(BaseCommand):
                         "Full migrations file '%s':" % writer.filename) + "\n"
                     )
                     self.stdout.write("%s\n" % writer.as_string())
+            last_migration = migration  # The last migration for this app
+            if not self.dry_run:
+                # For each app, create a migration lock file.  The
+                # purpose of this lock file is to materialize Django
+                # migration conflicts as filesystem merge conflicts.
+                writer = MigrationWriter(last_migration)
+                migrations_directory = writer.basedir
+                last_migration = writer.filename
+
+                lock_file_path = os.path.join(migrations_directory, LOCK_FILE_NAME)
+                now = datetime.datetime.fromtimestamp(time.time())
+                with open(lock_file_path, 'w') as f:
+                    f.write('This app was last migrated at %s: %s\n' % (now, last_migration))
+                    f.write('If you find yourself resolving a merge conflict in this file, ')
+                    f.write('then you are probably merging branches with conflicting migrations.\n')
+                if self.verbosity >= 1:
+                    self.stdout.write("  %s\n" % self.style.MIGRATE_LABEL(get_pretty_path(lock_file_path)))
+                    self.stdout.write("    - Update lock file\n")
 
     def handle_merge(self, loader, conflicts):
         """
