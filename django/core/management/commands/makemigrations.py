@@ -177,6 +177,14 @@ class Command(BaseCommand):
         """
         Take a changes dict and write them out as migration files.
         """
+        def get_pretty_path(path):
+            try:
+                pretty_path = os.path.relpath(path)
+            except ValueError:
+                pretty_path = path
+            if pretty_path.startswith('..'):
+                pretty_path = path
+            return pretty_path
         directory_created = {}
         for app_label, app_migrations in changes.items():
             if self.verbosity >= 1:
@@ -187,12 +195,7 @@ class Command(BaseCommand):
                 if self.verbosity >= 1:
                     # Display a relative path if it's below the current working
                     # directory, or an absolute path otherwise.
-                    try:
-                        migration_string = os.path.relpath(writer.path)
-                    except ValueError:
-                        migration_string = writer.path
-                    if migration_string.startswith('..'):
-                        migration_string = writer.path
+                    migration_string = get_pretty_path(writer.path)
                     self.stdout.write("  %s\n" % (self.style.MIGRATE_LABEL(migration_string),))
                     for operation in migration.operations:
                         self.stdout.write("    - %s\n" % operation.describe())
